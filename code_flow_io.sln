@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36804.6
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rest.Code-Flow-io", "src\Rest.Code-Flow-io\Rest.Code-Flow-io.csproj", "{D649E95E-B53B-4DAF-9B61-F679D34A83F3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rest.Code-Flow-io.Tests", "tests\Rest.Code-Flow-io.Tests\Rest.Code-Flow-io.Tests.csproj", "{F182EF11-F4D6-4118-BDD6-2995A45A83E3}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D649E95E-B53B-4DAF-9B61-F679D34A83F3} = {D649E95E-B53B-4DAF-9B61-F679D34A83F3}
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Itens de Solução", "Itens de Solução", "{380A7511-A354-6D7A-0CC0-8FA1F1BA7B6C}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D649E95E-B53B-4DAF-9B61-F679D34A83F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D649E95E-B53B-4DAF-9B61-F679D34A83F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D649E95E-B53B-4DAF-9B61-F679D34A83F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D649E95E-B53B-4DAF-9B61-F679D34A83F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F182EF11-F4D6-4118-BDD6-2995A45A83E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F182EF11-F4D6-4118-BDD6-2995A45A83E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F182EF11-F4D6-4118-BDD6-2995A45A83E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F182EF11-F4D6-4118-BDD6-2995A45A83E3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {98BA59CC-BE82-43C0-AE47-B31C9D214227}
+	EndGlobalSection
+EndGlobal
