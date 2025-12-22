@@ -15,7 +15,7 @@
 		<Version>1.0.0</Version>
 
 		<Authors>Luciano Targino</Authors>
-		<Description>Converte soluções C# em diagramas Mermaid (.mmd) a partir da estrutura do código.</Description>
+		<Description>Converts C# solutions into Mermaid diagrams (.mmd) based on the source code structure.</Description>
 		<RepositoryUrl>https://github.com/TARGINO0110/Code-Flow-IO</RepositoryUrl>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	</PropertyGroup>
@@ -27,5 +27,4 @@
 		<PackageReference Include="System.Net.Http.Json" Version="10.0.1" />
 		<PackageReference Include="Microsoft.Build.Framework" Version="17.11.31" ExcludeAssets="runtime" PrivateAssets="all" />
 	</ItemGroup>
-
 </Project>

@@ -1,94 +1,91 @@
 # Code-Flow-IO
 
-## Descrição
+## Description
 
-Code-Flow-IO é uma ferramenta que gera fluxogramas a partir do código-fonte C# de uma solução .NET.  
-Utiliza o Roslyn para analisar o Control Flow Graph (CFG) de cada método implementado e converte esse fluxo em diagramas [Mermaid](https://mermaid-js.github.io/), gerando arquivos `.mmd`, `.svg` e `.png` automaticamente.
+Code-Flow-IO is a tool that generates flowcharts from the C# source code of a .NET solution.  
+It uses Roslyn to analyze the Control Flow Graph (CFG) of each implemented method and converts that flow into [Mermaid](https://mermaid-js.github.io/) diagrams, automatically producing `.mmd`, `.svg`, and `.png` files.
 
-## Funcionamento
+## How it works
 
-1. **Leitura da solução:**  
-   O programa abre uma solução `.sln` informada pelo usuário.
+1. **Solution reading:**  
+   The tool opens a `.sln` specified by the user.
 
-2. **Compilação e análise:**  
-   Para cada projeto (ou projeto filtrado), compila e analisa todos os arquivos `.cs`.
+2. **Compilation and analysis:**  
+   For each project (or a filtered project) it compiles and analyzes all `.cs` files.
 
-3. **Geração do CFG:**  
-   Para cada método implementado (com corpo), gera o Control Flow Graph usando Roslyn.
+3. **CFG generation:**  
+   For each implemented method (with a body), the tool generates the Control Flow Graph using Roslyn.
 
-4. **Conversão para Mermaid:**  
-   O CFG é convertido em um diagrama Mermaid (`.mmd`).
+4. **Conversion to Mermaid:**  
+   The CFG is converted into a Mermaid diagram (`.mmd`).
 
-5. **Renderização dos diagramas:**  
-   Utiliza o [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli) (`mmdc`) para gerar os arquivos `.svg` e `.png` a partir do `.mmd`.
+5. **Diagram rendering:**  
+   The [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli) (`mmdc`) is used to produce `.svg` and `.png` files from the `.mmd`.
 
-6. **Arquivos gerados:**  
-   Os arquivos são salvos no diretório de saída especificado, sobrescrevendo versões anteriores.
+6. **Output files:**  
+   Generated files are saved to the specified output directory, overwriting previous versions.
 
-## Requisitos
+7. **Code Base**
+   Program.cs
+
+## Requirements
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download)
 - [Node.js](https://nodejs.org/)
-- [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli) instalado globalmente
+- [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli) installed globally
 
-## Instalação do Mermaid CLI
+## Install Mermaid CLI
 
-Para que a geração dos arquivos `.svg` e `.png` funcione, é necessário instalar o Mermaid CLI na sua máquina.
+To render `.svg` and `.png` files you must install the Mermaid CLI on your machine.
 
-**Instale o Mermaid CLI globalmente com o comando:**
+**Install Mermaid CLI globally with:**
 
 `npm install -g @mermaid-js/mermaid-cli`
 
+After installation, the `mmdc` command will be available in the terminal and will be used automatically by the tool to convert `.mmd` files into `.svg` and `.png`.
 
-Após a instalação, o comando `mmdc` estará disponível no terminal e será utilizado automaticamente pelo programa para converter os arquivos `.mmd` em `.svg` e `.png`.
+**Verify installation:**
 
-**Verifique a instalação:**
+`mmdc -h`
 
-`mmdc -h` 
+If the Mermaid CLI help appears, the installation is correct.
 
+## Project installation
 
-Se aparecer a ajuda do Mermaid CLI, está instalado corretamente.
+Clone the repository and restore dependencies:
 
-## Instalação do projeto
+`git clone <repository-url> && cd Code-Flow-IO && dotnet restore`
 
-Clone o repositório e instale as dependências:
+## How to run
 
-`git clone <url-do-repositorio> cd Code-Flow-IO dotnet restore`
+Run the command below, providing the solution path and output directory:
 
+`dotnet run --project src/Rest.Code-Flow-io/Rest.Code-Flow-io.csproj -- <path.sln> <out-dir>`
 
-## Como executar
+Example:
 
-Execute o comando abaixo, informando o caminho da solução e o diretório de saída:
+`dotnet run --project src/Rest.Code-Flow-io/Rest.Code-Flow-io.csproj -- C:\projects\my-sln.sln docs/flow/mmd`
 
-`dotnet run --project src/Rest.Code-Flow-io/Rest.Code-Flow-io.csproj -- <caminho.sln> <dir-saida>`
+To filter by a specific project:
 
+`dotnet run --project src/Rest.Code-Flow-io/Rest.Code-Flow-io.csproj -- C:\projects\my-sln.sln docs/flow/mmd --project ProjectName`
 
-Exemplo:
+## Generated files structure
 
-`dotnet run --project src/Rest.Code-Flow-io/Rest.Code-Flow-io.csproj -- C:\projetos\minha-sln.sln docs/flow/mmd`
+- `<out-dir>/<Project>_<File>_<Method>.mmd`  (Mermaid diagram)
+- `<out-dir>/<Project>_<File>_<Method>.svg`  (SVG image)
+- `<out-dir>/<Project>_<File>_<Method>.png`  (PNG image)
 
+Files are overwritten on each run.
 
-Para filtrar por um projeto específico:
+## Notes
 
-`dotnet run --project src/Rest.Code-Flow-io/Rest.Code-Flow-io.csproj -- C:\projetos\minha-sln.sln docs/flow/mmd --project NomeDoProjeto`
+- Only methods with bodies are processed (interfaces and abstract methods are ignored).
+- The Mermaid CLI must be available in the system PATH.
+- If any generated `.mmd` file causes a syntax error, inspect the `.mmd` content and adjust the source or sanitization logic as needed.
+- The program prints warnings with details when diagram generation fails.
 
-
-## Estrutura dos arquivos gerados
-
-- `<dir-saida>/<Projeto>_<Arquivo>_<Metodo>.mmd`  (diagrama Mermaid)
-- `<dir-saida>/<Projeto>_<Arquivo>_<Metodo>.svg`  (imagem SVG)
-- `<dir-saida>/<Projeto>_<Arquivo>_<Metodo>.png`  (imagem PNG)
-
-Os arquivos são sobrescritos a cada execução.
-
-## Observações
-
-- Apenas métodos com corpo são processados (interfaces e métodos abstratos são ignorados).
-- O Mermaid CLI precisa estar disponível no PATH do sistema.
-- Se algum arquivo `.mmd` gerar erro de sintaxe, verifique o conteúdo e ajuste o código conforme necessário.
-- O programa exibe avisos detalhados em caso de falha na geração dos diagramas.
-
-## Referências
+## References
 
 - [Mermaid CLI](https://github.com/mermaid-js/mermaid-cli)
 - [Mermaid Live Editor](https://mermaid.live/)

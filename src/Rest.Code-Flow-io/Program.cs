@@ -16,7 +16,7 @@ namespace Rest.Code_Flow_io
         {
             if (args.Length < 2)
             {
-                Console.WriteLine("Uso: cfg2mmd <caminho.sln> <dir-saida> [--project NomeProjeto]");
+                Console.WriteLine("Usage: cfg2mmd <path.sln> <out-dir> [--project ProjectName]");
                 return 1;
             }
 
@@ -28,7 +28,7 @@ namespace Rest.Code_Flow_io
             {
                 if (args.Length < 4)
                 {
-                    Console.Error.WriteLine("Erro: faltou o nome após --project.");
+                    Console.Error.WriteLine("Error: missing project name after --project.");
                     return 2;
                 }
                 onlyProject = args[3];
@@ -43,16 +43,16 @@ namespace Rest.Code_Flow_io
                 using var workspace = MSBuildWorkspace.Create();
                 workspace.RegisterWorkspaceFailedHandler(e => Console.Error.WriteLine($"[Workspace] {e.Diagnostic}"));
 
-                Console.WriteLine($"Abrindo solução: {slnPath}");
+                Console.WriteLine($"Opening solution: {slnPath}");
                 var solution = await workspace.OpenSolutionAsync(slnPath);
 
                 foreach (var project in solution.Projects.Where(p => onlyProject is null || p.Name == onlyProject))
                 {
-                    Console.WriteLine($"Projeto: {project.Name}");
+                    Console.WriteLine($"Project: {project.Name}");
                     var compilation = await project.GetCompilationAsync();
                     if (compilation is null)
                     {
-                        Console.Error.WriteLine($"[WARN] Não foi possível compilar {project.Name}");
+                        Console.Error.WriteLine($"[WARN] Could not compile {project.Name}");
                         continue;
                     }
 
@@ -73,7 +73,7 @@ namespace Rest.Code_Flow_io
 
                                 if (cfg is null)
                                 {
-                                    Console.Error.WriteLine($"[WARN] Não foi possível criar o CFG para {document.FilePath}::{method.Identifier}");
+                                    Console.Error.WriteLine($"[WARN] Could not create CFG for {document.FilePath}::{method.Identifier}");
                                     continue;
                                 }
 
@@ -86,46 +86,46 @@ namespace Rest.Code_Flow_io
 
                                 var path = Path.Combine(outDir, safeName + ".mmd");
 
-                                // Remove arquivos antigos antes de gerar novos
+                                // Remove old files before generating new ones
                                 DeleteIfExists(path);
                                 DeleteIfExists(Path.ChangeExtension(path, "svg"));
                                 DeleteIfExists(Path.ChangeExtension(path, "png"));
 
                                 await File.WriteAllTextAsync(path, mmd, Encoding.UTF8);
-                                Console.WriteLine($"Gerado: {path}");
+                                Console.WriteLine($"Generated: {path}");
 
-                                // Gerar SVG
+                                // Generate SVG
                                 if (await GenerateMermaidImage(path, "svg"))
-                                    Console.WriteLine($"Gerado: {Path.ChangeExtension(path, "svg")}");
+                                    Console.WriteLine($"Generated: {Path.ChangeExtension(path, "svg")}");
                                 else
-                                    Console.Error.WriteLine($"[WARN] Falha ao gerar SVG para {path}");
+                                    Console.Error.WriteLine($"[WARN] Failed to generate SVG for {path}");
 
-                                // Gerar PNG
+                                // Generate PNG
                                 if (await GenerateMermaidImage(path, "png"))
-                                    Console.WriteLine($"Gerado: {Path.ChangeExtension(path, "png")}");
+                                    Console.WriteLine($"Generated: {Path.ChangeExtension(path, "png")}");
                                 else
-                                    Console.Error.WriteLine($"[WARN] Falha ao gerar PNG para {path}");
+                                    Console.Error.WriteLine($"[WARN] Failed to generate PNG for {path}");
                             }
                             catch (Exception ex)
                             {
-                                Console.Error.WriteLine($"[WARN] Falha ao gerar CFG para {document.FilePath}::{method.Identifier}: {ex.Message}");
+                                Console.Error.WriteLine($"[WARN] Failed to generate CFG for {document.FilePath}::{method.Identifier}: {ex.Message}");
                             }
                         }
                     }
                 }
 
-                Console.WriteLine("Concluído.");
+                Console.WriteLine("Done.");
                 return 0;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[ERRO] {ex}");
+                Console.Error.WriteLine($"[ERROR] {ex}");
                 return 99;
             }
         }
 
         /// <summary>
-        /// Chama o Mermaid CLI (mmdc) para gerar SVG/PNG a partir do arquivo .mmd.
+        /// Calls the Mermaid CLI (mmdc) to generate SVG/PNG from the .mmd file.
         /// </summary>
         private static async Task<bool> GenerateMermaidImage(string mmdPath, string format)
         {
@@ -134,7 +134,7 @@ namespace Rest.Code_Flow_io
             string? mmdcPath = "mmdc";
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                // Procura mmdc.cmd no PATH
+                // Look for mmdc.cmd on the PATH
                 var paths = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';');
                 foreach (var p in paths)
                 {
@@ -170,14 +170,14 @@ namespace Rest.Code_Flow_io
 
 
         /// <summary>
-        /// Converte um ControlFlowGraph para Mermaid (flowchart).
+        /// Converts a ControlFlowGraph to a Mermaid flowchart.
         /// </summary>
         private static string BuildMermaid(ControlFlowGraph cfg, string project, string docName, MethodDeclarationSyntax method)
         {
             var sb = new StringBuilder();
 
-            sb.AppendLine("%% Diagrama gerado automaticamente (CFG -> Mermaid)");
-            sb.AppendLine($"%% Projeto: {project} | Arquivo: {docName} | Método: {method.Identifier.Text}");
+            sb.AppendLine("%% Diagram generated automatically (CFG -> Mermaid)");
+            sb.AppendLine($"%% Project: {project} | File: {docName} | Method: {method.Identifier.Text}");
             sb.AppendLine("flowchart TD");
 
             for (int i = 0; i < cfg.Blocks.Length; i++)
@@ -185,19 +185,21 @@ namespace Rest.Code_Flow_io
                 var block = cfg.Blocks[i];
                 var id = $"B{i}";
 
-                var ops = string.Join("\\n",
+                // use <br/> so Mermaid renders line breaks properly (prevents showing '\n' in PNG)
+                var ops = string.Join("<br/>",
                     block.Operations
                          .Select(op => op.Syntax?.ToString()?.Trim())
                          .Where(s => !string.IsNullOrWhiteSpace(s)));
 
-                var label = string.IsNullOrWhiteSpace(ops) ? $"Block {i}" : $"Block {i}\\n{Escape(ops)}";
+                var label = string.IsNullOrWhiteSpace(ops) ? $"Block {i}" : $"Block {i}<br/>{Escape(ops)}";
                 sb.AppendLine($"{id}[\"{label}\"]");
 
                 if (block.BranchValue is not null)
                 {
                     var condText = Escape(block.BranchValue.Syntax?.ToString() ?? "cond");
                     var did = $"D{i}";
-                    sb.AppendLine($"{did}{{\"{condText}\"}}");
+                    // use brackets for consistency and to avoid parser ambiguities
+                    sb.AppendLine($"{did}[\"{condText}\"]");
                     sb.AppendLine($"{id} --> {did}");
 
                     var condDest = BlockId(cfg, block.ConditionalSuccessor?.Destination);
@@ -231,7 +233,7 @@ namespace Rest.Code_Flow_io
         }
 
         /// <summary>
-        /// Retorna o ID textual do bloco de destino (B#), ou "END" se nulo.
+        /// Returns the textual ID of the destination block (B#), or "END" if null.
         /// </summary>
         private static string BlockId(ControlFlowGraph cfg, BasicBlock? dest)
         {
@@ -241,7 +243,7 @@ namespace Rest.Code_Flow_io
         }
 
         /// <summary>
-        /// Escapa caracteres problemáticos para Mermaid (aspas e quebras).
+        /// Escapes characters that break Mermaid syntax (quotes and line breaks).
         /// </summary>
         private static string Escape(string s)
         {
@@ -249,7 +251,8 @@ namespace Rest.Code_Flow_io
             return s.Replace("\"", "'")
                     .Replace("\\", "/")
                     .Replace("\r", " ")
-                    .Replace("\n", "\\n");
+                    // map newlines to <br/> (Mermaid renders HTML line breaks correctly)
+                    .Replace("\n", "<br/>");
         }
 
         private static void DeleteIfExists(string filePath)
@@ -261,7 +264,7 @@ namespace Rest.Code_Flow_io
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[WARN] Não foi possível deletar {filePath}: {ex.Message}");
+                Console.Error.WriteLine($"[WARN] Could not delete {filePath}: {ex.Message}");
             }
         }
     }

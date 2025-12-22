@@ -9,7 +9,7 @@ public class ProgramTests
     {
         var method = typeof(Program).GetMethod("Escape", BindingFlags.NonPublic | BindingFlags.Static);
         var input = "Texto \"com\" barras\\e\nquebra\rde linha";
-        var expected = "Texto 'com' barras/e\\nquebra de linha";
+        var expected = "Texto 'com' barras/e<br/>quebra de linha";
         var result = (string)method.Invoke(null, new object[] { input });
         Assert.Equal(expected, result);
     }
@@ -18,19 +18,19 @@ public class ProgramTests
     public void DeleteIfExists_RemovesFile()
     {
         var tempFile = Path.GetTempFileName();
-        File.WriteAllText(tempFile, "teste");
+        File.WriteAllText(tempFile, "test");
         var method = typeof(Program).GetMethod("DeleteIfExists", BindingFlags.NonPublic | BindingFlags.Static);
         method.Invoke(null, new object[] { tempFile });
         Assert.False(File.Exists(tempFile));
     }
 
-    // Removido teste que passa null para cfg
+    // Removed test that passed null to cfg
 
-    [Fact(Skip = "Requires mmdc CLI")]
+    [Fact(Skip = "Requires Mermaid CLI (mmdc)")]
     public async Task GenerateMermaidImage_ReturnsFalseIfProcessFails()
     {
         var method = typeof(Program).GetMethod("GenerateMermaidImage", BindingFlags.NonPublic | BindingFlags.Static);
-        var result = await (Task<bool>)method.Invoke(null, new object[] { "arquivo.mmd", "svg" });
+        var result = await (Task<bool>)method.Invoke(null, new object[] { "file.mmd", "svg" });
         Assert.False(result);
     }
 
