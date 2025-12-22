@@ -3,9 +3,11 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using Microsoft.Extensions.Configuration;
 using System.Text;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Configuration.Json;
 
 namespace Rest.Code_Flow_io
 {
@@ -35,6 +37,20 @@ namespace Rest.Code_Flow_io
             }
 
             Directory.CreateDirectory(outDir);
+
+            // Build configuration (appsettings.json optional)
+            var config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+                .Build();
+
+            // Read limits with sensible defaults
+            int maxDocsPerProject = config.GetValue<int?>("Architecture:MaxDocsPerProject") ?? 8;
+            int maxClassesPerProject = config.GetValue<int?>("Architecture:MaxClassesPerProject") ?? 10;
+            int maxMethodsPerClass = config.GetValue<int?>("Architecture:MaxMethodsPerClass") ?? 10;
+            int maxFreeMethods = config.GetValue<int?>("Architecture:MaxFreeMethods") ?? 10;
+
+            Console.WriteLine($"Architecture limits: Docs={maxDocsPerProject}, Classes={maxClassesPerProject}, MethodsPerClass={maxMethodsPerClass}, FreeMethods={maxFreeMethods}");
 
             try
             {
@@ -113,6 +129,10 @@ namespace Rest.Code_Flow_io
                         }
                     }
                 }
+
+                // Generate a topology / architecture file that interlinks projects, docs and the processing chain
+                await GenerateArchitectureDocuments(solution, outDir,
+                    maxDocsPerProject, maxClassesPerProject, maxMethodsPerClass, maxFreeMethods);
 
                 Console.WriteLine("Done.");
                 return 0;
@@ -265,6 +285,162 @@ namespace Rest.Code_Flow_io
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[WARN] Could not delete {filePath}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Generates architecture documentation (markdown + .mmd) describing the processing chain
+        /// and the list of projects/documents scanned. Also tries to render a SVG/PNG via mmdc.
+        /// Now includes classes and methods (limited) per project/document for readability.
+        /// </summary>
+        private static async Task GenerateArchitectureDocuments(Solution solution, string outDir,
+            int maxDocsPerProject, int maxClassesPerProject, int maxMethodsPerClass, int maxFreeMethods)
+        {
+            try
+            {
+                var docsDir = Path.Combine(outDir, "docs-architecture");
+                Directory.CreateDirectory(docsDir);
+
+                // Build mermaid diagram
+                var mmdSb = new StringBuilder();
+                mmdSb.AppendLine("flowchart TD");
+                mmdSb.AppendLine("  P[\"Program (entry)\"] --> ML[\"MSBuildLocator\"]");
+                mmdSb.AppendLine("  ML --> WS[\"MSBuildWorkspace\"]");
+                mmdSb.AppendLine("  WS --> SOL[\"Solution\"]");
+
+                int pIdx = 0;
+
+                foreach (var project in solution.Projects)
+                {
+                    var pid = $"PRJ{pIdx}";
+                    var safeProjectName = Escape(project.Name).Replace(" ", "_");
+                    mmdSb.AppendLine($"  SOL --> {pid}[\"Project: {safeProjectName}\"]");
+                    mmdSb.AppendLine($"  {pid} --> DOC{pIdx}[\"Documents (.cs)\"]");
+
+                    var docs = project.Documents.Take(maxDocsPerProject).ToList();
+                    for (int d = 0; d < docs.Count; d++)
+                    {
+                        var doc = docs[d];
+                        var docNode = $"PRJ{pIdx}D{d}";
+                        var docName = Path.GetFileName(doc.Name);
+                        mmdSb.AppendLine($"  DOC{pIdx} --> {docNode}[\"{Escape(docName)}\"]");
+                    }
+
+                    // try to get compilation to extract types/methods
+                    var compilation = await project.GetCompilationAsync();
+                    if (compilation is not null)
+                    {
+                        var classCount = 0;
+                        var freeMethodCount = 0;
+
+                        // iterate documents (limited) to extract type and method information
+                        foreach (var doc in project.Documents.Take(maxDocsPerProject))
+                        {
+                            var root = await doc.GetSyntaxRootAsync();
+                            if (root is null) continue;
+
+                            // classes/structs/records
+                            var types = root.DescendantNodes().Where(n =>
+                                        n is ClassDeclarationSyntax || n is StructDeclarationSyntax || n is RecordDeclarationSyntax)
+                                        .Cast<TypeDeclarationSyntax?>()
+                                        .Where(t => t is not null)
+                                        .Select(t => t!).ToList();
+
+                            foreach (var t in types)
+                            {
+                                if (classCount >= maxClassesPerProject) break;
+                                var classNode = $"PRJ{pIdx}C{classCount}";
+                                var className = ((TypeDeclarationSyntax)t).Identifier.Text;
+                                mmdSb.AppendLine($"  {pid} --> {classNode}[\"Class: {Escape(className)}\"]");
+                                mmdSb.AppendLine($"  {classNode} --> DOC{pIdx}"); // link to docs group for context
+
+                                // methods inside this class
+                                var methods = t.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                                               .Where(m => m.Body != null || m.ExpressionBody != null)
+                                               .Take(maxMethodsPerClass)
+                                               .ToList();
+
+                                for (int mi = 0; mi < methods.Count; mi++)
+                                {
+                                    var mnode = $"PRJ{pIdx}C{classCount}M{mi}";
+                                    var mname = methods[mi].Identifier.Text;
+                                    mmdSb.AppendLine($"  {classNode} --> {mnode}[\"Method: {Escape(mname)}()\"]");
+                                }
+
+                                classCount++;
+                            }
+
+                            // top-level methods (e.g., in scripts or partials not inside type) - limited
+                            var topMethods = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                                            .Where(m =>
+                                            {
+                                                // method whose nearest ancestor that is a TypeDeclarationSyntax is null => top-level
+                                                return m.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault() == null;
+                                            }).Take(maxFreeMethods).ToList();
+
+                            foreach (var tm in topMethods)
+                            {
+                                if (freeMethodCount >= maxFreeMethods) break;
+                                var mnode = $"PRJ{pIdx}FM{freeMethodCount}";
+                                var mname = tm.Identifier.Text;
+                                mmdSb.AppendLine($"  {pid} --> {mnode}[\"TopMethod: {Escape(mname)}()\"]");
+                                freeMethodCount++;
+                            }
+                        }
+                    }
+
+                    // show the per-project pipeline
+                    mmdSb.AppendLine($"  PRJ{pIdx} --> CFG{pIdx}[\"ControlFlowGraph (per-method)\"]");
+                    mmdSb.AppendLine($"  CFG{pIdx} --> BM{pIdx}[\"BuildMermaid()\"]");
+                    mmdSb.AppendLine($"  BM{pIdx} --> MMD{pIdx}[\"{Escape(project.Name)}.mmd\"]");
+                    mmdSb.AppendLine($"  MMD{pIdx} --> MMDC{pIdx}[\"Mermaid CLI (mmdc)\"]");
+                    mmdSb.AppendLine($"  MMDC{pIdx} --> OUT{pIdx}[\".svg / .png\"]");
+
+                    pIdx++;
+                }
+
+                mmdSb.AppendLine("  P --> DEL[\"DeleteIfExists() (cleanup)\"]");
+                mmdSb.AppendLine("  P --> GEN[\"GenerateMermaidImage() (calls mmdc)\"]");
+
+                var mmdContent = mmdSb.ToString();
+
+                // Markdown wrapper
+                var mdSb = new StringBuilder();
+                mdSb.AppendLine("# Architecture — Code-Flow-IO");
+                mdSb.AppendLine();
+                mdSb.AppendLine("This file describes the processing chain and the projects/documents scanned by the tool.");
+                mdSb.AppendLine();
+                mdSb.AppendLine("## Projects scanned");
+                foreach (var proj in solution.Projects)
+                {
+                    mdSb.AppendLine($"- {proj.Name}");
+                }
+                mdSb.AppendLine();
+                mdSb.AppendLine("## Flow diagram (Mermaid)");
+                mdSb.AppendLine();
+                mdSb.AppendLine("```mermaid");
+                mdSb.AppendLine(mmdContent);
+                mdSb.AppendLine("```");
+                mdSb.AppendLine();
+                mdSb.AppendLine("*Generated automatically by the tool.*");
+
+                var mdPath = Path.Combine(docsDir, "ARCHITECTURE.md");
+                var mmdPath = Path.Combine(docsDir, "ARCHITECTURE.mmd");
+
+                await File.WriteAllTextAsync(mdPath, mdSb.ToString(), Encoding.UTF8);
+                await File.WriteAllTextAsync(mmdPath, mmdContent, Encoding.UTF8);
+
+                Console.WriteLine($"Architecture docs generated: {mdPath} and {mmdPath}");
+
+                // Try to render the diagram images (best-effort)
+                if (await GenerateMermaidImage(mmdPath, "svg"))
+                    Console.WriteLine($"Architecture SVG generated: {Path.ChangeExtension(mmdPath, "svg")}");
+                if (await GenerateMermaidImage(mmdPath, "png"))
+                    Console.WriteLine($"Architecture PNG generated: {Path.ChangeExtension(mmdPath, "png")}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WARN] Failed to generate architecture documents: {ex.Message}");
             }
         }
     }
